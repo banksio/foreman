@@ -13,7 +13,7 @@ preflight → full-upgrade → reboot → confirm new kernel → remove old kern
 foreman needs root, so install it system-wide. `--managed-python` matters: without it uv picks up the system Python, which `full-upgrade` may replace while foreman is running.
 
 ```bash
-sudo env UV_TOOL_DIR=/opt/foreman/tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/foreman/python uv tool install --managed-python --python 3.13 git+<your-repo>
+sudo env UV_TOOL_DIR=/opt/foreman/tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/foreman/python uv tool install --managed-python --python 3.13 git+https://github.com/banksio/foreman
 ```
 
 Optional settings go in `/etc/foreman/config.toml`. See [config.example.toml](config.example.toml) for all of them and their defaults.
@@ -56,3 +56,7 @@ journalctl -u foreman-resume
 ```bash
 uv run pytest
 ```
+
+## Licence
+
+[MIT](LICENSE)

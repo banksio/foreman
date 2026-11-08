@@ -3,6 +3,8 @@ name = "hostforeman"
 version = "0.1.0"
 description = "Unattended apt upgrades, reboots, kernel cleanup and Compose updates for Debian-family hosts"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "rich>=13.7",
