@@ -1,0 +1,31 @@
+# Copy to /etc/foreman/config.toml. Every setting is optional; these are the defaults.
+
+[preflight]
+min_free_mb = 500                # below this on /, try apt clean, then postpone
+min_free_boot_mb = 100           # below this on /boot/firmware, postpone
+network_hosts = ["deb.debian.org", "archive.raspberrypi.com"]
+require_clock_sync = true
+
+[reboot]
+window = "03:00-05:00"           # server local time, may span midnight, "" for any time
+watch_services = ["ssh"]         # must be enabled at boot, or the reboot is blocked
+
+[kernels]
+remove_old = true
+keep_previous = 1                # older kernels to keep, per flavour
+
+[compose]
+enabled = true
+exclude = []                     # project names or directories never to touch
+allow_databases = []             # database stacks you do want updated
+health_timeout = 180             # seconds to wait for updated containers
+settle = 15                      # seconds they must stay healthy
+boot_settle = 60                 # seconds to let containers start after a reboot
+prune_dangling = true
+prune_tagged_days = 0            # 30 also removes unused tagged images older than 30 days
+
+[disk]
+paths = ["/", "/boot/firmware"]  # Docker's data directory is added automatically
+warn_percent = 85
+critical_percent = 95
+consumers = ["/var/cache/apt", "/var/log", "/var/lib/docker", "/home", "/root", "/tmp"]

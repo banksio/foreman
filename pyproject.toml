@@ -1,0 +1,28 @@
+[project]
+name = "hostforeman"
+version = "0.1.0"
+description = "Unattended apt upgrades, reboots, kernel cleanup and Compose updates for Debian-family hosts"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "rich>=13.7",
+    "typer>=0.12",
+]
+
+[project.scripts]
+foreman = "hostforeman.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hostforeman"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
