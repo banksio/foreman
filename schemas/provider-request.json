@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Request",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "$ref": "#/$defs/Mode"
+    },
+    "phase": {
+      "$ref": "#/$defs/Step"
+    },
+    "stack": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "phase",
+    "mode"
+  ],
+  "$defs": {
+    "Mode": {
+      "type": "string",
+      "enum": [
+        "preview",
+        "apply"
+      ]
+    },
+    "Step": {
+      "type": "string",
+      "enum": [
+        "cycle",
+        "preflight",
+        "upgrade",
+        "reboot",
+        "kernels",
+        "workloads",
+        "compose",
+        "disk"
+      ]
+    }
+  }
+}

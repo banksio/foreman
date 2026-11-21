@@ -1,0 +1,17 @@
+[Unit]
+Description=Resume a pending Foreman maintenance cycle
+Wants=network-online.target
+After=network-online.target time-sync.target docker.service
+ConditionPathExists=/var/lib/foreman/cycle-v1.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/foreman __resume
+ExecStopPost=/usr/bin/foreman __reconcile-resume
+TimeoutStartSec=4h
+TimeoutStopSec=5min
+KillMode=mixed
+SuccessExitStatus=3 4 5
+
+[Install]
+WantedBy=multi-user.target

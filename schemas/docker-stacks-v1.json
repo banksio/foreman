@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StackList",
+  "type": "object",
+  "properties": {
+    "discovery_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "stacks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/StackStatus"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "stacks"
+  ],
+  "$defs": {
+    "ImageChange": {
+      "type": "object",
+      "properties": {
+        "manifest": {
+          "type": "string"
+        },
+        "new_id": {
+          "type": "string"
+        },
+        "new_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "old_id": {
+          "type": "string"
+        },
+        "old_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "platform": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "replicas": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "service": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service",
+        "reference",
+        "old_id",
+        "new_id",
+        "manifest",
+        "platform",
+        "replicas"
+      ]
+    },
+    "StackResult": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ImageChange"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "outcome",
+        "reason",
+        "changes",
+        "warnings",
+        "at"
+      ]
+    },
+    "StackStatus": {
+      "type": "object",
+      "properties": {
+        "eligibility": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "enroll_command": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "enrolled": {
+          "type": "boolean"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "last_result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StackResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "migration_candidate": {
+          "type": "boolean"
+        },
+        "project": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recovery_pending": {
+          "type": "boolean"
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workdir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "project",
+        "files",
+        "services",
+        "enrolled",
+        "enabled",
+        "migration_candidate",
+        "eligibility",
+        "warnings",
+        "recovery_pending"
+      ]
+    }
+  }
+}

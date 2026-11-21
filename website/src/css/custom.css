@@ -1,0 +1,41 @@
+:root {
+  --ifm-color-primary: #116958;
+  --ifm-color-primary-dark: #0f5e4f;
+  --ifm-color-primary-darker: #0e594a;
+  --ifm-color-primary-darkest: #0c493e;
+  --ifm-color-primary-light: #137461;
+  --ifm-color-primary-lighter: #147966;
+  --ifm-color-primary-lightest: #168975;
+  --ifm-code-font-size: 93%;
+  --ifm-heading-font-family: ui-sans-serif, system-ui, sans-serif;
+  --ifm-menu-color-background-active: #e7f3ee;
+  --docusaurus-highlighted-code-line-bg: rgb(17 105 88 / 12%);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #6bdeb9;
+  --ifm-color-primary-dark: #4fd8ac;
+  --ifm-color-primary-darker: #41d5a5;
+  --ifm-color-primary-darkest: #2ab78a;
+  --ifm-color-primary-light: #87e4c6;
+  --ifm-color-primary-lighter: #95e7cd;
+  --ifm-color-primary-lightest: #bff0e1;
+  --ifm-background-color: #111a1a;
+  --ifm-background-surface-color: #172322;
+  --ifm-menu-color-background-active: #203d36;
+  --docusaurus-highlighted-code-line-bg: rgb(107 222 185 / 15%);
+}
+
+.navbar__title {
+  letter-spacing: -0.025em;
+  font-size: 1.1rem;
+}
+
+.theme-doc-markdown h1 {
+  letter-spacing: -0.04em;
+  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
+}
+
+.theme-doc-markdown > p:first-of-type {
+  font-size: 1.12rem;
+}

@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+if [ "$1" = configure ]; then
+    shadow=/etc/systemd/system/foreman-resume.service
+    if [ ! -e "$shadow" ] && [ ! -L "$shadow" ]; then
+        if deb-systemd-helper --quiet was-enabled foreman-resume.service; then
+            deb-systemd-helper enable foreman-resume.service >/dev/null
+        else
+            deb-systemd-helper update-state foreman-resume.service >/dev/null
+        fi
+    fi
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload
+    fi
+fi

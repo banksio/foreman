@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Event",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "phase_started"
+        },
+        "module": {
+          "type": "string"
+        },
+        "phase": {
+          "$ref": "#/$defs/Step"
+        }
+      },
+      "required": [
+        "kind",
+        "module",
+        "phase"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "phase_finished"
+        },
+        "module": {
+          "type": "string"
+        },
+        "phase": {
+          "$ref": "#/$defs/Step"
+        },
+        "report": {
+          "$ref": "#/$defs/Report"
+        }
+      },
+      "required": [
+        "kind",
+        "module",
+        "phase",
+        "report"
+      ]
+    }
+  ],
+  "$defs": {
+    "Outcome": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "unchanged",
+        "skipped",
+        "blocked",
+        "failed",
+        "invalid",
+        "waiting",
+        "busy"
+      ]
+    },
+    "Report": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "details": true,
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "outcome",
+        "summary",
+        "warnings",
+        "details",
+        "at"
+      ]
+    },
+    "Step": {
+      "type": "string",
+      "enum": [
+        "cycle",
+        "preflight",
+        "upgrade",
+        "reboot",
+        "kernels",
+        "workloads",
+        "compose",
+        "disk"
+      ]
+    }
+  }
+}
