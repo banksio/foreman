@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+          - arch: amd64
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      RUST_IMAGE: rust:1.100.0-bookworm@sha256:ade39a710ef85f3506cffcfec3e8a24ba090badef1dff2fb798f71d878833fea
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate tag
+        run: |
+          [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" == tag ]]
+          git merge-base --is-ancestor HEAD origin/main
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+      - name: Test and build on Debian 12
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,src=$PWD,dst=/src" --workdir /src \
+            --env CARGO_HOME=/tmp/foreman-cargo \
+            --env SOURCE_DATE_EPOCH --env VERSION --env ARCH \
+            "$RUST_IMAGE" bash -euc '
+              cargo test --locked
+              cargo build --release --locked
+              packaging/debian/build.sh target/release/foreman "$VERSION" "$ARCH" dist
+            '
+      - name: Smoke test package lifecycle on Debian 12
+        run: |
+          docker run --rm --mount "type=bind,src=$PWD/dist,dst=/dist,readonly" \
+            --env VERSION --env ARCH debian:bookworm-slim bash -euc '
+              export DEBIAN_FRONTEND=noninteractive
+              package="/dist/foreman_${VERSION}_$ARCH.deb"
+              apt-get -q update
+              apt-get -qy install --no-install-recommends "$package"
+              test "$(foreman --version)" = "foreman $VERSION"
+              foreman --help
+              test -f /etc/foreman/config.example.toml
+              test -L /etc/systemd/system/multi-user.target.wants/foreman-resume.service
+              test ! -e /etc/systemd/system/timers.target.wants/foreman-notify.timer
+              install -d /var/lib/foreman
+              touch /var/lib/foreman/operator-test
+              dpkg --install "$package"
+              dpkg --remove foreman
+              test -f /etc/foreman/config.example.toml
+              test ! -L /etc/systemd/system/multi-user.target.wants/foreman-resume.service
+              dpkg --install "$package"
+              test -L /etc/systemd/system/multi-user.target.wants/foreman-resume.service
+              dpkg --purge foreman
+              test ! -e /etc/foreman/config.example.toml
+              test -f /var/lib/foreman/operator-test
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: foreman-${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: foreman-*
+          path: dist
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        working-directory: dist
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          arm64="foreman_${version}_arm64.deb"
+          amd64="foreman_${version}_amd64.deb"
+          sha256sum "$arm64" "$amd64" > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Foreman $version" \
+            --generate-notes "$arm64" "$amd64" SHA256SUMS

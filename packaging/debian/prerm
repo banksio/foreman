@@ -1,0 +1,53 @@
+#!/bin/sh
+set -eu
+
+owned() {
+    [ -f "$1" ] && [ ! -L "$1" ] && [ "$(head -n 1 "$1")" = '# Managed by Foreman' ]
+}
+
+case "$1" in
+    remove|deconfigure)
+        if [ -d /run/systemd/system ]; then
+            for path in /etc/systemd/system/foreman-job-*.timer /etc/systemd/system/foreman-window.timer; do
+                if owned "$path"; then
+                    systemctl disable --now "${path##*/}"
+                fi
+            done
+            if systemctl is-enabled --quiet foreman-notify.timer; then
+                systemctl disable --now foreman-notify.timer
+            else
+                systemctl stop foreman-notify.timer
+            fi
+            systemctl stop foreman-notify.service
+            if [ ! -e /etc/systemd/system/foreman-resume.service ] && [ ! -L /etc/systemd/system/foreman-resume.service ]; then
+                systemctl stop foreman-resume.service
+            fi
+            for path in /etc/systemd/system/foreman-job-*.service; do
+                if owned "$path"; then
+                    systemctl stop "${path##*/}"
+                fi
+            done
+        fi
+        for path in /etc/systemd/system/foreman-job-*.timer /etc/systemd/system/foreman-job-*.service /etc/systemd/system/foreman-window.timer; do
+            if owned "$path"; then
+                unit=${path##*/}
+                link=/etc/systemd/system/timers.target.wants/$unit
+                if [ -L "$link" ] && [ "$(readlink -f "$link")" = "$path" ]; then
+                    rm -- "$link"
+                fi
+                if [ -f "/var/lib/systemd/timers/stamp-$unit" ]; then
+                    rm -- "/var/lib/systemd/timers/stamp-$unit"
+                fi
+                rm -- "$path"
+            fi
+        done
+        if [ -L /etc/systemd/system/timers.target.wants/foreman-notify.timer ] &&
+            [ "$(readlink -f /etc/systemd/system/timers.target.wants/foreman-notify.timer)" = "$(readlink -f /lib/systemd/system/foreman-notify.timer)" ]; then
+            rm -- /etc/systemd/system/timers.target.wants/foreman-notify.timer
+        fi
+        if [ -L /etc/systemd/system/multi-user.target.wants/foreman-resume.service ] &&
+            [ "$(readlink -f /etc/systemd/system/multi-user.target.wants/foreman-resume.service)" = "$(readlink -f /lib/systemd/system/foreman-resume.service)" ]; then
+            rm -- /etc/systemd/system/multi-user.target.wants/foreman-resume.service
+        fi
+        ;;
+esac

@@ -1,0 +1,12 @@
+[Unit]
+Description=Deliver pending Foreman notifications
+Wants=network-online.target
+After=network-online.target time-sync.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/foreman __notify
+TimeoutStartSec=5min
+TimeoutStopSec=30s
+KillMode=mixed
+SuccessExitStatus=3 4 5

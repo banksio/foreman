@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+case "$1" in
+    remove|purge)
+        shadow=/etc/systemd/system/foreman-resume.service
+        if [ ! -e "$shadow" ] && [ ! -L "$shadow" ]; then
+            deb-systemd-helper purge foreman-resume.service >/dev/null
+        fi
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload
+        fi
+        ;;
+esac
+
+if [ "$1" = purge ]; then
+    rm -f -- /var/lib/systemd/timers/stamp-foreman-notify.timer
+    # Operator intent, rollback references, and Python history can share these paths.
+    # Purge only the package conffile (handled by dpkg) and empty shared directories.
+    rmdir /etc/foreman /var/lib/foreman 2>/dev/null || true
+fi

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt --component clippy
+      - run: cargo +1.100.0 fmt --all -- --check
+      - run: cargo +1.100.0 clippy --all-targets --locked -- -D warnings
+      - run: cargo +1.100.0 test --locked
+      - name: Check generated JSON schemas
+        run: |
+          generated="$(mktemp -d)"
+          trap 'rm -rf -- "$generated"' EXIT
+          cargo +1.100.0 run --locked -- __schemas "$generated"
+          diff -ru schemas "$generated"
+      - name: Check installer and Debian hooks
+        run: |
+          bash -n install.sh
+          bash -n packaging/debian/build.sh
+          for hook in postinst prerm postrm; do sh -n "packaging/debian/$hook"; done
+          bash install.sh --help
+          shellcheck install.sh packaging/debian/{build.sh,postinst,prerm,postrm}
+
+  docs:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm run build
