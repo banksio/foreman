@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScheduleList",
+  "type": "object",
+  "properties": {
+    "schedules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entry"
+      }
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "timezone": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "timezone",
+    "schedules"
+  ],
+  "$defs": {
+    "Attempt": {
+      "type": "object",
+      "properties": {
+        "generation": {
+          "type": "string"
+        },
+        "invocation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Report"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "started": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "generation",
+        "started"
+      ]
+    },
+    "Entry": {
+      "type": "object",
+      "properties": {
+        "calendar": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "last_attempt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "next_run": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reboot": {
+          "$ref": "#/$defs/JobReboot"
+        },
+        "run": {
+          "$ref": "#/$defs/Step"
+        },
+        "schema_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "name",
+        "schema_version",
+        "generation",
+        "calendar",
+        "run",
+        "reboot",
+        "enabled"
+      ]
+    },
+    "JobReboot": {
+      "type": "string",
+      "enum": [
+        "inherit",
+        "never"
+      ]
+    },
+    "Outcome": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "unchanged",
+        "skipped",
+        "blocked",
+        "failed",
+        "invalid",
+        "waiting",
+        "busy"
+      ]
+    },
+    "Report": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "details": true,
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "outcome",
+        "summary",
+        "warnings",
+        "details",
+        "at"
+      ]
+    },
+    "Step": {
+      "type": "string",
+      "enum": [
+        "cycle",
+        "preflight",
+        "upgrade",
+        "reboot",
+        "kernels",
+        "workloads",
+        "compose",
+        "disk"
+      ]
+    }
+  }
+}

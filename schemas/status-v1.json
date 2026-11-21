@@ -1,0 +1,787 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Status",
+  "type": "object",
+  "properties": {
+    "cycle": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Cycle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "disk": {
+      "$ref": "#/$defs/Report"
+    },
+    "docker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StackList"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "foreman_version": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "host": {
+      "$ref": "#/$defs/Host"
+    },
+    "last_steps": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Report"
+      }
+    },
+    "legacy_units": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notifications": {
+      "$ref": "#/$defs/State"
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModuleStatus"
+      }
+    },
+    "reboot": {
+      "$ref": "#/$defs/RebootStatus"
+    },
+    "reboot_mode": {
+      "$ref": "#/$defs/RebootMode"
+    },
+    "reboot_window": {
+      "type": "string"
+    },
+    "schedules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entry"
+      }
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "generated_at",
+    "foreman_version",
+    "host",
+    "reboot",
+    "reboot_window",
+    "reboot_mode",
+    "disk",
+    "last_steps",
+    "providers",
+    "schedules",
+    "notifications",
+    "legacy_units"
+  ],
+  "$defs": {
+    "Attempt": {
+      "type": "object",
+      "properties": {
+        "generation": {
+          "type": "string"
+        },
+        "invocation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Report"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "started": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "generation",
+        "started"
+      ]
+    },
+    "Cycle": {
+      "type": "object",
+      "properties": {
+        "configuration": {
+          "type": "string"
+        },
+        "executable_version": {
+          "type": "string"
+        },
+        "finished": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "handoff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Handoff"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "in_flight": {
+          "type": "boolean"
+        },
+        "mode": {
+          "$ref": "#/$defs/RebootMode"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Outcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phase": {
+          "$ref": "#/$defs/Phase"
+        },
+        "reports": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Report"
+          }
+        },
+        "resume_invocation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schema_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "started": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schema_version",
+        "executable_version",
+        "configuration",
+        "started",
+        "phase",
+        "in_flight",
+        "mode",
+        "reports"
+      ]
+    },
+    "Entry": {
+      "type": "object",
+      "properties": {
+        "calendar": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "last_attempt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "next_run": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reboot": {
+          "$ref": "#/$defs/JobReboot"
+        },
+        "run": {
+          "$ref": "#/$defs/Step"
+        },
+        "schema_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "name",
+        "schema_version",
+        "generation",
+        "calendar",
+        "run",
+        "reboot",
+        "enabled"
+      ]
+    },
+    "Event": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attempts": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "delivered": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "last_attempt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Outcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "at",
+        "attempts",
+        "delivered"
+      ]
+    },
+    "Handoff": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "boot_id": {
+          "type": "string"
+        },
+        "expected_kernel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "at",
+        "boot_id"
+      ]
+    },
+    "Host": {
+      "type": "object",
+      "properties": {
+        "architecture": {
+          "type": "string"
+        },
+        "bootloader": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "pi_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile": {
+          "type": "string"
+        },
+        "systemd": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profile",
+        "systemd",
+        "hostname",
+        "kernel",
+        "architecture",
+        "os"
+      ]
+    },
+    "ImageChange": {
+      "type": "object",
+      "properties": {
+        "manifest": {
+          "type": "string"
+        },
+        "new_id": {
+          "type": "string"
+        },
+        "new_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "old_id": {
+          "type": "string"
+        },
+        "old_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "platform": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "replicas": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "service": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service",
+        "reference",
+        "old_id",
+        "new_id",
+        "manifest",
+        "platform",
+        "replicas"
+      ]
+    },
+    "JobReboot": {
+      "type": "string",
+      "enum": [
+        "inherit",
+        "never"
+      ]
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "cycle",
+        "rollback",
+        "stale_reboot",
+        "heartbeat"
+      ]
+    },
+    "ModuleStatus": {
+      "type": "object",
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "command_group": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "exclusive_resource": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Step"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "phases",
+        "requires",
+        "enabled",
+        "available",
+        "reason"
+      ]
+    },
+    "Outcome": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "unchanged",
+        "skipped",
+        "blocked",
+        "failed",
+        "invalid",
+        "waiting",
+        "busy"
+      ]
+    },
+    "Phase": {
+      "type": "string",
+      "enum": [
+        "preflight",
+        "upgrade",
+        "reboot",
+        "verify",
+        "kernels",
+        "workloads",
+        "disk",
+        "finished"
+      ]
+    },
+    "RebootMode": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "never"
+      ]
+    },
+    "RebootStatus": {
+      "type": "object",
+      "properties": {
+        "expected_kernel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "needed": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "needed",
+        "reason"
+      ]
+    },
+    "Report": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "details": true,
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "outcome",
+        "summary",
+        "warnings",
+        "details",
+        "at"
+      ]
+    },
+    "StackList": {
+      "type": "object",
+      "properties": {
+        "discovery_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "stacks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StackStatus"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "stacks"
+      ]
+    },
+    "StackResult": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ImageChange"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "outcome",
+        "reason",
+        "changes",
+        "warnings",
+        "at"
+      ]
+    },
+    "StackStatus": {
+      "type": "object",
+      "properties": {
+        "eligibility": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "enroll_command": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "enrolled": {
+          "type": "boolean"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "last_result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StackResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "migration_candidate": {
+          "type": "boolean"
+        },
+        "project": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recovery_pending": {
+          "type": "boolean"
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workdir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "project",
+        "files",
+        "services",
+        "enrolled",
+        "enabled",
+        "migration_candidate",
+        "eligibility",
+        "warnings",
+        "recovery_pending"
+      ]
+    },
+    "State": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Event"
+          }
+        },
+        "reboot_observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "schema_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "stale_queued": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "stale_queued",
+        "events"
+      ]
+    },
+    "Step": {
+      "type": "string",
+      "enum": [
+        "cycle",
+        "preflight",
+        "upgrade",
+        "reboot",
+        "kernels",
+        "workloads",
+        "compose",
+        "disk"
+      ]
+    }
+  }
+}

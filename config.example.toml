@@ -1,0 +1,49 @@
+# Examples and defaults for Foreman. Put local settings in
+# /etc/foreman/config.toml or /etc/foreman/conf.d/*.toml.
+
+[preflight]
+min_free_mb = 500
+min_free_boot_mb = 100
+network_hosts = []
+require_clock_sync = true
+
+[apt]
+max_removals = 0
+protected_packages = []
+
+[reboot]
+mode = "auto"
+window = "03:00-05:00"
+watch_services = ["ssh"]
+cooldown_hours = 24
+pending_days = 7
+
+[kernels]
+remove_old = true
+keep_previous = 1
+
+[compose]
+enabled = true
+exclude = []
+allow_databases = []
+health_timeout = 180
+settle = 15
+boot_settle = 60
+prune_dangling = true
+# registry_config = "/etc/foreman/docker-auth"
+# prune_tagged_days = 30
+
+[disk]
+paths = ["/", "/boot/firmware"]
+warn_percent = 85
+critical_percent = 95
+consumers = ["/var/cache/apt", "/var/log", "/var/lib/docker", "/home", "/root", "/tmp"]
+
+[maintenance]
+workloads_after_host_failure = false
+
+[notifications]
+stale_reboot_days = 3
+# webhook_url_file = "/etc/foreman/secrets/webhook-url"
+# heartbeat_url_file = "/etc/foreman/secrets/heartbeat-url"
+# heartbeat_schedule = "weekly"
