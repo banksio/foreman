@@ -122,7 +122,7 @@ pub fn arm_window(ctx: &Context<'_>, at: NaiveTime) -> AppResult<()> {
     arm_continuation(ctx, &format!("OnCalendar=*-*-* {}", at.format("%H:%M:%S")))
 }
 
-pub fn arm_handoff_check(ctx: &Context<'_>, seconds: i64) -> AppResult<()> {
+pub fn arm_delay(ctx: &Context<'_>, seconds: i64) -> AppResult<()> {
     arm_continuation(ctx, &format!("OnActiveSec={seconds}s"))
 }
 

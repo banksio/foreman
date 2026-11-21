@@ -191,6 +191,7 @@ enum SelfCommand {
     },
 }
 
+#[derive(Clone, Copy)]
 pub struct Context<'a> {
     pub config: &'a Config,
     pub paths: &'a Paths,
@@ -314,6 +315,12 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
         store::check_protected_parent(&paths.config_dir)?;
         store::check_protected_parent(&paths.state_dir)?;
     }
+    let _maintenance_lock = if takes_maintenance_lock(&cli.command) {
+        require_root()?;
+        Some(store::lock(&paths.lock)?)
+    } else {
+        None
+    };
     let config = Config::load(&paths)?;
     let host = host::Host::detect();
     let is_preview = matches!(&cli.command, Command::Run(Run { dry_run: true, .. }));
@@ -352,11 +359,6 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
                 no_reboot: run.no_reboot,
                 reboot_now: run.reboot_now,
             };
-            let _guard = if ctx.dry_run || run.step == Step::Disk {
-                None
-            } else {
-                Some(admin_lock(&ctx)?)
-            };
             cycle::run(
                 &ctx,
                 run.step,
@@ -368,10 +370,7 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
         }
         Command::Cycle {
             command: CycleCommand::Abort,
-        } => {
-            let _guard = admin_lock(&ctx)?;
-            cycle::abort(&ctx)?
-        }
+        } => cycle::abort(&ctx)?,
         Command::Schedule {
             command: None | Some(schedule::Action::List),
         } => {
@@ -403,10 +402,7 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
         }
         Command::Schedule {
             command: Some(command),
-        } => {
-            let _guard = admin_lock(&ctx)?;
-            schedule::command(&ctx, command)?
-        }
+        } => schedule::command(&ctx, command)?,
         Command::Modules {
             command: None | Some(ModuleCommand::List),
         } => {
@@ -426,7 +422,6 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
         Command::Modules {
             command: Some(command),
         } => {
-            let _guard = admin_lock(&ctx)?;
             cycle::reject_pending(&ctx)?;
             match command {
                 ModuleCommand::Enable { id } => providers::change(&ctx, &id, true)?,
@@ -448,19 +443,12 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
         Command::Docker {
             command: DockerCommand::Stack { command },
         } => {
-            let _guard = if matches!(&command, docker::DockerAction::Show { .. }) {
-                None
-            } else {
-                let guard = admin_lock(&ctx)?;
+            if !matches!(&command, docker::DockerAction::Show { .. }) {
                 cycle::reject_pending(&ctx)?;
-                Some(guard)
-            };
+            }
             docker::command(&ctx, command)?
         }
-        Command::Resume => {
-            let _guard = admin_lock(&ctx)?;
-            cycle::resume(&ctx)?
-        }
+        Command::Resume => cycle::resume(&ctx)?,
         Command::Scheduled { name } => scheduled(&ctx, name)?,
         Command::Reconcile { name } => {
             require_root()?;
@@ -486,7 +474,6 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
 
 fn scheduled(ctx: &Context<'_>, name: String) -> AppResult<Report> {
     require_root()?;
-    systemd::require(ctx)?;
     let job = schedule::load(ctx, &name)?;
     let mut attempt = schedule::attempt(name, &job);
     schedule::save_attempt(ctx, &attempt)?;
@@ -500,7 +487,13 @@ fn scheduled(ctx: &Context<'_>, name: String) -> AppResult<Report> {
         } else {
             Some(store::lock(&ctx.paths.lock)?)
         };
-        // Re-read intent after taking the maintenance lock, where applicable.
+        // A module or policy may have changed while this run was waiting for the lock.
+        let config = Config::load(ctx.paths)?;
+        let ctx = &Context {
+            config: &config,
+            ..*ctx
+        };
+        systemd::require(ctx)?;
         let current = schedule::load(ctx, &attempt.name)?;
         if !current.enabled
             || current.generation != job.generation
@@ -552,9 +545,24 @@ fn require_root() -> AppResult<()> {
     }
 }
 
-fn admin_lock(ctx: &Context<'_>) -> AppResult<std::fs::File> {
-    require_root()?;
-    store::lock(&ctx.paths.lock)
+fn takes_maintenance_lock(command: &Command) -> bool {
+    match command {
+        Command::Run(run) => !run.dry_run && run.step != Step::Disk,
+        Command::Schedule {
+            command: Some(action),
+        } => !matches!(
+            action,
+            schedule::Action::List | schedule::Action::Show { .. }
+        ),
+        Command::Modules {
+            command: Some(action),
+        } => !matches!(action, ModuleCommand::List),
+        Command::Docker {
+            command: DockerCommand::Stack { command },
+        } => !matches!(command, docker::DockerAction::Show { .. }),
+        Command::Cycle { .. } | Command::Resume => true,
+        _ => false,
+    }
 }
 
 #[derive(Serialize, JsonSchema)]

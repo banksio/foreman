@@ -62,6 +62,8 @@ pub struct Cycle {
 struct Handoff {
     at: DateTime<Utc>,
     boot_id: String,
+    #[serde(default)]
+    boot_uptime: Option<u64>,
     expected_kernel: Option<String>,
 }
 
@@ -160,8 +162,7 @@ fn record(ctx: &Context<'_>, step: Step, report: &Report) -> AppResult<()> {
 fn verify(ctx: &Context<'_>, handoff: &Handoff) -> AppResult<Report> {
     let boot_id = host::boot_id()?;
     if boot_id == handoff.boot_id {
-        let elapsed = Utc::now() - handoff.at;
-        if elapsed >= TimeDelta::zero() && elapsed < TimeDelta::seconds(BOOT_GRACE) {
+        if handoff_in_grace(handoff) {
             return Ok(Report::new(
                 Outcome::Waiting,
                 "Waiting for a different boot ID after the requested reboot",
@@ -180,13 +181,31 @@ fn verify(ctx: &Context<'_>, handoff: &Handoff) -> AppResult<Report> {
     Ok(report)
 }
 
+fn boot_uptime() -> Option<u64> {
+    std::fs::read_to_string("/proc/uptime")
+        .ok()?
+        .split_whitespace()
+        .next()?
+        .split('.')
+        .next()?
+        .parse()
+        .ok()
+}
+
+fn handoff_in_grace(handoff: &Handoff) -> bool {
+    handoff.boot_uptime.zip(boot_uptime()).map_or_else(
+        || Utc::now() - handoff.at < TimeDelta::seconds(BOOT_GRACE),
+        |(start, now)| now.saturating_sub(start) < BOOT_GRACE as u64,
+    )
+}
+
 pub fn abort(ctx: &Context<'_>) -> AppResult<Report> {
     let Some(mut cycle) = read(ctx)?.filter(|cycle| cycle.finished.is_none()) else {
         return Ok(Report::new(Outcome::Unchanged, "No pending cycle"));
     };
     if let Some(handoff) = &cycle.handoff
         && host::boot_id()? == handoff.boot_id
-        && Utc::now() - handoff.at < TimeDelta::seconds(BOOT_GRACE)
+        && handoff_in_grace(handoff)
     {
         return Err(Error::busy(
             "A reboot handoff is still within its grace period",
@@ -618,6 +637,29 @@ fn reboot(
         return Ok(report);
     }
     systemd::require(ctx)?;
+    if ctx.module_enabled("raspberry-pi-os")
+        && let Err(error) = host::reboot_clock_safety(ctx)
+    {
+        let mut report = Report::new(
+            if ctx.dry_run {
+                Outcome::Unchanged
+            } else {
+                Outcome::Waiting
+            },
+            "Reboot is deferred while the host clock synchronizes",
+        );
+        report.warnings.push(error.message);
+        if !ctx.dry_run
+            && cycle.is_some()
+            && let Err(error) =
+                systemd::install_resume(ctx).and_then(|()| systemd::arm_delay(ctx, 300))
+        {
+            report
+                .warnings
+                .push(format!("Automatic continuation setup failed: {error}"));
+        }
+        return Ok(report);
+    }
     host::reboot_safety(ctx)?;
     let now = Utc::now();
     let path = ctx.paths.observation(REBOOT);
@@ -676,12 +718,13 @@ fn reboot(
         cycle.handoff = Some(Handoff {
             at: now,
             boot_id: host::boot_id()?,
+            boot_uptime: boot_uptime(),
             expected_kernel: observation.expected_kernel,
         });
         cycle.phase = Phase::Verify;
         cycle.in_flight = false;
         save(ctx, cycle)?;
-        if let Err(error) = systemd::arm_handoff_check(ctx, BOOT_GRACE + 15) {
+        if let Err(error) = systemd::arm_delay(ctx, BOOT_GRACE + 15) {
             watchdog_warning = Some(format!(
                 "Reboot watchdog could not start. Run foreman run if the host does not restart: {error}"
             ));

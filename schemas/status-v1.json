@@ -332,6 +332,15 @@
         "boot_id": {
           "type": "string"
         },
+        "boot_uptime": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        },
         "expected_kernel": {
           "type": [
             "string",
