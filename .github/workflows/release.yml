@@ -3,12 +3,21 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated release tag
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -26,16 +35,20 @@ jobs:
       ARCH: ${{ matrix.arch }}
       RUST_IMAGE: rust:1.100.0-bookworm@sha256:ade39a710ef85f3506cffcfec3e8a24ba090badef1dff2fb798f71d878833fea
     steps:
+      - name: Validate tag name
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
       - name: Validate tag
         run: |
-          [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
-          [[ "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" == tag ]]
+          [[ "$(git cat-file -t "refs/tags/$RELEASE_TAG")" == tag ]]
+          [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{}")" == "$(git rev-parse HEAD)" ]]
           git merge-base --is-ancestor HEAD origin/main
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
       - name: Test and build on Debian 12
         run: |
@@ -96,9 +109,16 @@ jobs:
           GH_REPO: ${{ github.repository }}
         working-directory: dist
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           arm64="foreman_${version}_arm64.deb"
           amd64="foreman_${version}_amd64.deb"
           sha256sum "$arm64" "$amd64" > SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Foreman $version" \
-            --generate-notes "$arm64" "$amd64" SHA256SUMS
+          if assets=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name'); then
+            for asset in "$arm64" "$amd64" SHA256SUMS; do
+              grep -Fxq -- "$asset" <<< "$assets"
+            done
+            echo "Release $RELEASE_TAG is published with all required assets."
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --title "Foreman $version" \
+              --generate-notes "$arm64" "$amd64" SHA256SUMS
+          fi
