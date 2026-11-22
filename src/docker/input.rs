@@ -55,6 +55,10 @@ pub(super) fn absolute(directory: &Path, path: &Path) -> AppResult<PathBuf> {
 }
 
 pub(super) fn trusted(path: &Path, directory: bool) -> AppResult<TrustedInput> {
+    inspect(path, directory, false)
+}
+
+fn inspect(path: &Path, directory: bool, relaxed: bool) -> AppResult<TrustedInput> {
     let mut input = None;
     for ancestor in path.ancestors() {
         let metadata = fs::symlink_metadata(ancestor).map_err(|error| {
@@ -68,7 +72,13 @@ pub(super) fn trusted(path: &Path, directory: bool) -> AppResult<TrustedInput> {
         } else {
             metadata.is_file()
         };
-        if !expected_type || metadata.uid() != 0 || metadata.mode() & 0o022 != 0 {
+        if !expected_type && relaxed {
+            return Err(Error::blocked(format!(
+                "Docker input {} has the wrong file type or traverses a symlink",
+                ancestor.display()
+            )));
+        }
+        if !expected_type || (!relaxed && (metadata.uid() != 0 || metadata.mode() & 0o022 != 0)) {
             return Err(Error::blocked(format!(
                 "Docker input {} must be root-owned, may only be writable by root, and cannot traverse symlinks",
                 ancestor.display(),
@@ -117,8 +127,8 @@ fn read(path: &Path) -> AppResult<String> {
     Ok(contents)
 }
 
-fn trusted_env(path: &Path) -> AppResult<TrustedInput> {
-    let metadata = trusted(path, false)?;
+fn trusted_env(path: &Path, relaxed: bool) -> AppResult<TrustedInput> {
+    let metadata = inspect(path, false, relaxed)?;
     if read(path)?.lines().any(|line| {
         let line = line.trim_start();
         let line = line
@@ -147,13 +157,14 @@ fn add_reference(
     workdir: &Path,
     value: &Value,
     allow_optional: bool,
+    relaxed: bool,
 ) -> AppResult<()> {
     if let Value::Tagged(tagged) = value {
-        return add_reference(result, workdir, &tagged.value, allow_optional);
+        return add_reference(result, workdir, &tagged.value, allow_optional, relaxed);
     }
     if let Some(entries) = value.as_sequence() {
         for entry in entries {
-            add_reference(result, workdir, entry, allow_optional)?;
+            add_reference(result, workdir, entry, allow_optional, relaxed)?;
         }
         return Ok(());
     }
@@ -181,11 +192,11 @@ fn add_reference(
     }
     let path = absolute(workdir, Path::new(path))?;
     if required || exists(&path)? {
-        result.push(trusted(&path, false)?);
+        result.push(inspect(&path, false, relaxed)?);
     } else {
         for parent in path.ancestors().skip(1) {
             if exists(parent)? {
-                result.push(trusted(parent, true)?);
+                result.push(inspect(parent, true, relaxed)?);
                 break;
             }
         }
@@ -200,8 +211,13 @@ fn untag(value: &Value) -> &Value {
     }
 }
 
-fn audit_yaml(path: &Path, workdir: &Path, result: &mut Vec<TrustedInput>) -> AppResult<()> {
-    result.push(trusted(path, false)?);
+fn audit_yaml(
+    path: &Path,
+    workdir: &Path,
+    result: &mut Vec<TrustedInput>,
+    relaxed: bool,
+) -> AppResult<()> {
+    result.push(inspect(path, false, relaxed)?);
     let mut source: Value = serde_yaml::from_str(&read(path)?).map_err(|_| {
         Error::blocked(format!(
             "Cannot validate Compose YAML in {}",
@@ -239,7 +255,7 @@ fn audit_yaml(path: &Path, workdir: &Path, result: &mut Vec<TrustedInput>) -> Ap
             }
             for (key, optional) in [("env_file", true), ("label_file", false)] {
                 if let Some(file) = service.get(key) {
-                    add_reference(result, workdir, file, optional)?;
+                    add_reference(result, workdir, file, optional, relaxed)?;
                 }
             }
         }
@@ -248,7 +264,7 @@ fn audit_yaml(path: &Path, workdir: &Path, result: &mut Vec<TrustedInput>) -> Ap
         if let Some(resources) = source.get(name).and_then(|value| untag(value).as_mapping()) {
             for resource in resources.values().map(untag) {
                 if let Some(file) = resource.get("file") {
-                    add_reference(result, workdir, file, false)?;
+                    add_reference(result, workdir, file, false, relaxed)?;
                 }
             }
         }
@@ -275,12 +291,13 @@ pub(super) fn audit(enrollment: &Enrollment) -> AppResult<Vec<TrustedInput>> {
             "Docker enrollment has a non-canonical input path",
         ));
     }
-    let mut result = vec![trusted(&enrollment.workdir, true)?];
+    let relaxed = enrollment.relax_input_ownership;
+    let mut result = vec![inspect(&enrollment.workdir, true, relaxed)?];
     for file in &enrollment.files {
-        audit_yaml(file, &enrollment.workdir, &mut result)?;
+        audit_yaml(file, &enrollment.workdir, &mut result, relaxed)?;
     }
     if let Some(file) = &enrollment.env_file {
-        result.push(trusted_env(file)?);
+        result.push(trusted_env(file, relaxed)?);
     } else if exists(&enrollment.workdir.join(".env"))? {
         return Err(Error::blocked(
             "A new .env appeared since enrollment. Review and re-enroll the project.",
@@ -425,6 +442,23 @@ pub(super) fn validate_options(enrollment: &Enrollment) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ownership_exception_still_rejects_symlinks() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let temp = tempfile::tempdir().unwrap();
+        let dir = temp.path().canonicalize().unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o775)).unwrap();
+        let file = dir.join("compose.yaml");
+        fs::write(&file, "services: {}").unwrap();
+        assert!(trusted(&file, false).is_err());
+        assert!(inspect(&file, false, true).is_ok());
+
+        let link = dir.join("linked.yaml");
+        symlink(&file, &link).unwrap();
+        assert!(inspect(&link, false, true).is_err());
+    }
 
     #[test]
     fn rejects_paths_that_cannot_be_matched_to_labels() {

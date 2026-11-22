@@ -12,7 +12,7 @@ Use a [supported 64-bit Debian-family host](./compatibility.md) with Bash, curl 
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl
-curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.1.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.1.1/install.sh | bash
 ```
 
 The installer selects the package using `dpkg --print-architecture`, verifies the SHA-256 checksum from the tagged release and passes the package to APT. It refuses to replace a newer Foreman package with an older release.

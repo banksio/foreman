@@ -830,6 +830,7 @@ pub(super) fn maintain(
         ) {
             result.warnings.push(result.reason.clone());
         }
+        result.warnings.extend(enrollment.input_warning());
         warnings.extend(
             result
                 .warnings

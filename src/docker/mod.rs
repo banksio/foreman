@@ -23,6 +23,7 @@ pub struct DockerConfig {
     pub enabled: bool,
     pub exclude: Vec<String>,
     pub allow_databases: Vec<String>,
+    pub allow_user_owned_projects: Vec<String>,
     pub registry_config: Option<PathBuf>,
     pub health_timeout: u64,
     pub settle: u64,
@@ -37,6 +38,7 @@ impl Default for DockerConfig {
             enabled: true,
             exclude: vec![],
             allow_databases: vec![],
+            allow_user_owned_projects: vec![],
             registry_config: None,
             health_timeout: 180,
             settle: 15,
@@ -49,6 +51,9 @@ impl Default for DockerConfig {
 
 impl DockerConfig {
     pub fn validate(&self) -> AppResult<()> {
+        for project in &self.allow_user_owned_projects {
+            checked_id(project)?;
+        }
         if self.settle == 0
             || self.settle >= self.health_timeout
             || self.health_timeout > 1800
@@ -119,6 +124,8 @@ struct Enrollment {
     registry_config: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     observed_inputs: Vec<input::TrustedInput>,
+    #[serde(skip)]
+    relax_input_ownership: bool,
 }
 
 fn yes() -> bool {
@@ -126,6 +133,21 @@ fn yes() -> bool {
 }
 
 impl Enrollment {
+    fn apply_input_policy(&mut self, ctx: &Context<'_>) {
+        self.relax_input_ownership = ctx
+            .config
+            .compose
+            .allow_user_owned_projects
+            .contains(&self.project);
+    }
+
+    fn input_warning(&self) -> Option<String> {
+        self.relax_input_ownership.then(|| format!(
+            "{} allows user-owned or writable Compose inputs. Anyone who can edit or replace them can influence root Docker maintenance.",
+            self.project
+        ))
+    }
+
     fn compose_args<'a, const N: usize>(&'a self, args: [&'a str; N]) -> Vec<&'a str> {
         let mut base = vec![
             "compose",
@@ -216,7 +238,7 @@ fn get(ctx: &Context, id: &str) -> AppResult<Option<Enrollment>> {
     input::trusted(&path, false)?;
     let contents =
         store::read(&path)?.ok_or_else(|| Error::failed("Docker enrollment disappeared"))?;
-    let enrollment: Enrollment = toml::from_str(&contents)
+    let mut enrollment: Enrollment = toml::from_str(&contents)
         .map_err(|_| Error::invalid(format!("Invalid Docker enrollment {}", path.display())))?;
     if enrollment.project != id || enrollment.schema_version != SCHEMA_VERSION {
         return Err(Error::invalid(format!(
@@ -225,6 +247,7 @@ fn get(ctx: &Context, id: &str) -> AppResult<Option<Enrollment>> {
         )));
     }
     input::validate_options(&enrollment)?;
+    enrollment.apply_input_policy(ctx);
     Ok(Some(enrollment))
 }
 
@@ -416,7 +439,10 @@ pub fn list(ctx: &Context) -> AppResult<StackList> {
             state.recovery.is_some(),
             discovery_error.as_deref(),
         );
-        let mut warnings = Vec::new();
+        let mut warnings: Vec<_> = enrollment
+            .and_then(Enrollment::input_warning)
+            .into_iter()
+            .collect();
         if let Some(enrollment) = enrollment.filter(|_| eligibility.code == "eligible") {
             match Engine::new(enrollment.registry(ctx))
                 .and_then(|engine| update::check_drift(&engine, enrollment, containers))
@@ -573,6 +599,7 @@ fn enroll(
         warn_on_config_drift: false,
         registry_config: None,
         observed_inputs: vec![],
+        relax_input_ownership: false,
     };
     input::validate_options(&enrollment)?;
     let engine = Engine::new(enrollment.registry(ctx))?;
@@ -600,10 +627,17 @@ fn enroll(
             "These Compose inputs belong to a different running project. Check --project.",
         ));
     }
-    let mut warnings = Vec::new();
+    enrollment.apply_input_policy(ctx);
+    let mut warnings: Vec<_> = enrollment.input_warning().into_iter().collect();
     match input::audit(&enrollment) {
         Ok(inputs) => {
-            enrollment.project = input::render(&engine, &enrollment)?.name;
+            let resolved = input::render(&engine, &enrollment)?.name;
+            if enrollment.relax_input_ownership && resolved != enrollment.project {
+                return Err(Error::blocked(
+                    "Compose returned a different project than the configured ownership exception",
+                ));
+            }
+            enrollment.project = resolved;
             enrollment.observed_inputs = inputs;
         }
         Err(error) if !matches.is_empty() => warnings.push(error.message),

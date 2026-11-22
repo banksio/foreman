@@ -9,7 +9,7 @@ Foreman runs local maintenance on Debian-family hosts. Preview package changes, 
 On a supported 64-bit Debian-family host with Bash, curl, and administrative access:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.1.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.1.1/install.sh | bash
 foreman --version
 foreman status
 sudo foreman run --dry-run --no-reboot

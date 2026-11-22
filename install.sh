@@ -8,7 +8,7 @@
     exit 1
   }
 
-  tag=v0.1.0
+  tag=v0.1.1
   case "${1:-}" in
     '')
       [[ $# == 0 ]] || die 'Use --version vMAJOR.MINOR.PATCH.'
@@ -25,7 +25,7 @@
       die "Unknown argument: $1"
       ;;
   esac
-  [[ $tag =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || die 'Expected a stable tag such as v0.1.0.'
+  [[ $tag =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || die 'Expected a stable tag such as v0.1.1.'
 
   [[ $(uname -s) == Linux ]] || die 'This installer requires Linux.'
   for cmd in curl apt-get dpkg dpkg-deb dpkg-query sha256sum awk mktemp; do

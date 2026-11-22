@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Added an administrator-controlled, per-project exception for user-owned Docker Compose inputs. Foreman warns when the exception is active.
+
 ## 0.1.0
 
 - Added the Rust Foreman CLI and bundled host, systemd, and Docker providers.
