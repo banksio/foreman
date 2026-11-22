@@ -1,6 +1,5 @@
 ---
 title: Quick start
-slug: /
 description: Install Foreman and preview your first maintenance cycle.
 ---
 
