@@ -1,0 +1,73 @@
+.hero {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: calc(100svh - var(--ifm-navbar-height));
+  padding: 4rem 1.25rem;
+  background: radial-gradient(ellipse 72% 58% at 50% 19%, var(--foreman-hero-glow), transparent);
+  text-align: center;
+}
+
+.content {
+  max-width: 42rem;
+}
+
+.content h1 {
+  margin: 0;
+  font-size: clamp(3.75rem, 11vw, 8.5rem);
+  line-height: 1;
+  letter-spacing: -0.065em;
+}
+
+.content p {
+  max-width: 31rem;
+  margin: 1.5rem auto 0;
+  color: var(--ifm-font-color-secondary);
+  font-size: clamp(1.125rem, 3vw, 1.5rem);
+  text-wrap: balance;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.actions a:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 4px;
+}
+
+.actions .start {
+  background: var(--foreman-yellow);
+  color: #241b08;
+}
+
+.actions .start:hover {
+  background: #ffdf7e;
+  color: #241b08;
+}
+
+.actions .github {
+  border-color: var(--ifm-color-emphasis-400);
+  color: var(--ifm-font-color-base);
+}
+
+.actions .github:hover {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}

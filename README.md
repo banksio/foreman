@@ -19,7 +19,7 @@ The installer verifies the release checksum and installs a Debian package throug
 
 ## Documentation
 
-- [Quick start](https://banksio.github.io/foreman/)
+- [Quick start](https://banksio.github.io/foreman/quick-start/)
 - [Compatibility and host profiles](https://banksio.github.io/foreman/compatibility/)
 - [Maintenance and reboots](https://banksio.github.io/foreman/maintenance/)
 - [Schedules](https://banksio.github.io/foreman/schedules/)
