@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Foreman">
+  <style>
+    .prompt { fill: #303030; }
+    @media (prefers-color-scheme: dark) { .prompt { fill: #e6e6e6; } }
+  </style>
+  <path fill="#f5b926" d="M5 30l4-17L22 1h20l13 12 4 17z"/>
+  <path fill="#ffe170" d="M28 1h8l4 27H24z"/>
+  <path fill="#ffd34d" d="M0 28h64v4l-6 5H6l-6-5z"/>
+  <path class="prompt" d="m11 40 20 11-20 12-4-6 12-6-12-5zM36 56h21v7H36z"/>
+</svg>

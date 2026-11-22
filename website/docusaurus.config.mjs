@@ -1,7 +1,7 @@
 const config = {
   title: 'Foreman',
   tagline: 'Maintenance for Debian-family hosts',
-  favicon: 'img/foreman.svg',
+  favicon: 'img/foreman-favicon.svg',
   url: 'https://banksio.github.io',
   baseUrl: '/foreman/',
   organizationName: 'banksio',
