@@ -761,6 +761,11 @@ fn print_docker(stacks: &docker::StackList) -> AppResult<()> {
                 println!("  {}", parts.join(" "));
             }
         }
+        if let Some(warnings) = row["warnings"].as_array() {
+            for warning in warnings.iter().filter_map(serde_json::Value::as_str) {
+                warn(warning);
+            }
+        }
         if let Some(result) = row["last_result"]["outcome"].as_str() {
             println!("  Last result  {}", literal(result));
         }

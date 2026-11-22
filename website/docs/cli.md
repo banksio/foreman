@@ -24,7 +24,7 @@ Run `foreman --help` for the global options and a command with `--help` for its 
 | `foreman docker stack` | Use `enroll`, `show`, `enable`, `disable`, `retry` or `unenroll` for one project. |
 | `foreman modules list` | Inspect installed providers. Use `modules enable` or `modules disable` to change activation where supported. |
 | `foreman self version`, `foreman --version` | Print the installed binary's version. |
-| `foreman self update [--check]` | Show the package update path and exit with a controlled block. |
+| `foreman self update [--check]` | Show the Debian package upgrade path and exit with a controlled block. The quick installer uses APT to install a tagged package. Run the installer from a newer release to upgrade it. |
 
 Use `--dry-run` with `run` to preview. The mutually exclusive `--no-reboot` and `--reboot-now` flags apply to `run`. `--verbose` increases detail and `--no-progress` suppresses activity indicators. Set `--color auto|always|never` for terminal output. Automatic color respects redirected output and `NO_COLOR`.
 

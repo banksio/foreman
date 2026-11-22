@@ -26,6 +26,8 @@ keep_previous = 1
 enabled = true
 exclude = []
 allow_databases = []
+# Users who can edit these projects can influence root Docker maintenance.
+allow_user_owned_projects = []
 health_timeout = 180
 settle = 15
 boot_settle = 60

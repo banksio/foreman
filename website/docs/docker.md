@@ -24,6 +24,15 @@ sudo foreman docker stack enroll /srv/example/compose.yaml \
 
 Compose and environment inputs, including their containing paths, need to be root-owned and protected from group or world writes. Keep the full project in a dedicated administrative path such as `/srv`, with direct paths. Foreman checks the live project identity against the enrolled file paths, project directory and name. Keep `.env` and other environment inputs with the reviewed deployment. The trust checks in this release require statically identifiable local inputs and block Compose `include`, `extends`, and service providers.
 
+For a project whose maintainers you already trust with root Docker access, add its exact Compose project name to a root-owned Foreman config file, such as `/etc/foreman/conf.d/90-docker-ownership.toml`.
+
+```toml
+[compose]
+allow_user_owned_projects = ["public_caddy"]
+```
+
+Foreman warns during enrollment, status, and maintenance. Anyone who can edit or replace these inputs can influence root Docker maintenance. Direct paths, explicit enrollment, live project identity, config drift checks, and root-only enrollment and registry settings still apply. Remove the name from the list to restore the ownership requirement. If Foreman has already recorded the enrollment, changing the list is sufficient. If you maintain the list in more than one drop-in, the last definition replaces the whole list.
+
 ## Eligibility and health checks
 
 Explicit exclusions take priority over enrollment and database opt-ins. Foreman skips paused and stopped projects. Database-like images and mount points require an administrator opt-in through `compose.allow_databases`.
