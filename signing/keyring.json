@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "keys": [
+    {
+      "id": "release-v1",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAEi1mzbfLfziIn5X87xyspCRGxtvX+jpRf0oXNkXLvE4=\n-----END PUBLIC KEY-----\n",
+      "expires_at": "2028-11-01T00:00:00Z"
+    }
+  ]
+}

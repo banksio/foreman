@@ -18,4 +18,4 @@ A manual run, scheduled job, or preview goes through the same phase definitions.
 
 Operator settings live under `/etc/foreman`. Mutable results and checkpoints live under `/var/lib/foreman`. The state files and JSON command responses have versioned representations. The JSON command output is the supported integration point for this release. [CLI JSON output](./cli.md#machine-readable-output)
 
-This release ships webhook and heartbeat notification providers. Dedicated ntfy and email providers, external executable modules and direct binary self-update remain planned.
+This release ships webhook and heartbeat notification providers. Dedicated ntfy and email providers and external executable modules remain planned. Standalone installations support verified operator-triggered self-updates.

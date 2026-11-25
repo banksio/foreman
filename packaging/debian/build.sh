@@ -26,7 +26,7 @@ install -m 0755 "$binary" "$stage/usr/bin/foreman"
 install -m 0644 "$repo/config.example.toml" "$stage/etc/foreman/config.example.toml"
 install -m 0644 "$repo/LICENSE" "$stage/usr/share/doc/foreman/copyright"
 install -m 0644 "$here/"*.service "$here/"*.timer "$stage/lib/systemd/system/"
-install -m 0755 "$here/postinst" "$here/prerm" "$here/postrm" "$stage/DEBIAN/"
+install -m 0755 "$here/preinst" "$here/postinst" "$here/prerm" "$here/postrm" "$stage/DEBIAN/"
 printf '/etc/foreman/config.example.toml\n' > "$stage/DEBIAN/conffiles"
 cat > "$stage/DEBIAN/control" <<EOF
 Package: foreman

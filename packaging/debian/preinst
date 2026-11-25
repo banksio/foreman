@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+case "$1" in
+    install|upgrade)
+        if [ -e /usr/local/lib/foreman/receipt.json ] || [ -L /usr/local/lib/foreman/receipt.json ]; then
+            printf '%s\n' 'Standalone Foreman is installed. Use sudo foreman self update or remove standalone Foreman before installing the Debian package.' >&2
+            exit 1
+        fi
+        ;;
+esac

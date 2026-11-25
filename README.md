@@ -9,13 +9,15 @@ Foreman runs local maintenance on Debian-family hosts. Preview package changes, 
 On a supported 64-bit Debian-family host with Bash, curl, and administrative access:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.1.1/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.2.0/install.sh | bash
 foreman --version
 foreman status
 sudo foreman run --dry-run --no-reboot
 ```
 
 The installer verifies the release checksum and installs a Debian package through APT. A fresh install has no recurring maintenance jobs.
+
+For a standalone install that supports `foreman self update`, see [installation and updates](https://banksio.github.io/foreman/quick-start/#standalone-installation).
 
 ## Documentation
 

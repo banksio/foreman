@@ -5,6 +5,14 @@ use std::time::Duration;
 
 pub const MANAGED: &str = "# Managed by Foreman";
 pub const RUNNER: &str = "/usr/bin/foreman";
+pub fn runner() -> &'static str {
+    if crate::updater::uses_local_binary() {
+        crate::updater::EXECUTABLE
+    } else {
+        RUNNER
+    }
+}
+
 pub const RESUME: &str = "foreman-resume.service";
 pub const WINDOW: &str = "foreman-window.timer";
 

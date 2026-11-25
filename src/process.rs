@@ -1,6 +1,7 @@
 use crate::{AppResult, Error};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::os::fd::AsRawFd;
+use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -52,11 +53,33 @@ pub fn run_env(
     timeout: Duration,
     env: &[(&str, &str)],
 ) -> AppResult<Output> {
+    run_command(program, args, timeout, env, None)
+}
+
+pub fn apt_with_progress(
+    args: &[&str],
+    timeout: Duration,
+    env: &[(&str, &str)],
+    label: &str,
+) -> AppResult<Output> {
+    let mut args = args.to_vec();
+    args.extend(["-o", "APT::Status-Fd=3"]);
+    run_command("apt-get", &args, timeout, env, Some(label))
+}
+
+fn run_command(
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+    env: &[(&str, &str)],
+    progress: Option<&str>,
+) -> AppResult<Output> {
     if interrupted() {
         return Err(Error::failed("Foreman was interrupted"));
     }
 
-    let child = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .env_clear()
         .env("PATH", PATH)
@@ -66,8 +89,34 @@ pub fn run_env(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .process_group(0)
-        .spawn();
+        .process_group(0);
+    let mut writer = None;
+    let mut progress = if let Some(label) = progress {
+        let (input, output) = UnixStream::pair()?;
+        input.set_nonblocking(true)?;
+        let fd = output.as_raw_fd();
+        // Only async-signal-safe operations run after fork and before exec.
+        unsafe {
+            command.pre_exec(move || {
+                if libc::dup2(fd, 3) < 0 || libc::fcntl(3, libc::F_SETFD, 0) < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        writer = Some(output);
+        Some(AptProgress {
+            input,
+            label,
+            line: Vec::new(),
+            dropping: false,
+            last: None,
+        })
+    } else {
+        None
+    };
+    let child = command.spawn();
+    drop(writer);
     let mut child = match child {
         Ok(child) => child,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
@@ -109,8 +158,14 @@ pub fn run_env(
                 }));
 
         loop {
+            if let Some(progress) = &mut progress {
+                progress.read_available();
+            }
             overflow |= drain(&mut stdout, &mut out)? | drain(&mut stderr, &mut err)?;
             if let Some(status) = child.try_wait()? {
+                if let Some(progress) = &mut progress {
+                    progress.read_available();
+                }
                 overflow |= drain(&mut stdout, &mut out)? | drain(&mut stderr, &mut err)?;
                 if interrupted() || stop.is_some() {
                     return Err(Error::failed(format!(
@@ -121,6 +176,12 @@ pub fn run_env(
                     return Err(Error::failed(format!(
                         "{program} exceeded its output limit"
                     )));
+                }
+                if status.success()
+                    && let Some(progress) = &mut progress
+                    && let Some((stage, _)) = progress.last
+                {
+                    progress.render(stage, 100);
                 }
                 return Ok(Output {
                     stdout: String::from_utf8_lossy(&out).into_owned(),
@@ -191,4 +252,100 @@ fn drain(pipe: &mut impl Read, output: &mut Vec<u8>) -> io::Result<bool> {
         }
     }
     Ok(overflow)
+}
+
+struct AptProgress<'a> {
+    input: UnixStream,
+    label: &'a str,
+    line: Vec<u8>,
+    dropping: bool,
+    last: Option<(&'static str, u8)>,
+}
+
+impl AptProgress<'_> {
+    fn read_available(&mut self) {
+        let mut chunk = [0; 4096];
+        for _ in 0..16 {
+            let Ok(count) = self.input.read(&mut chunk) else {
+                break;
+            };
+            if count == 0 {
+                break;
+            }
+            for &byte in &chunk[..count] {
+                if byte == b'\n' {
+                    if !self.dropping
+                        && let Some((stage, percent)) = apt_position(&self.line)
+                    {
+                        self.render(stage, percent);
+                    }
+                    self.line.clear();
+                    self.dropping = false;
+                } else if self.line.len() < 4096 {
+                    self.line.push(byte);
+                } else {
+                    self.dropping = true;
+                }
+            }
+        }
+    }
+
+    fn render(&mut self, stage: &'static str, percent: u8) {
+        if self.last == Some((stage, percent)) {
+            return;
+        }
+        self.last = Some((stage, percent));
+        let mut stderr = io::stderr().lock();
+        let filled = usize::from(percent / 5);
+        let _ = write!(
+            stderr,
+            "\r{} {stage:<11} [{}{}] {percent:>3}%",
+            self.label,
+            "#".repeat(filled),
+            "-".repeat(20 - filled)
+        );
+        let _ = stderr.flush();
+    }
+}
+
+impl Drop for AptProgress<'_> {
+    fn drop(&mut self) {
+        if self.last.is_some() {
+            let _ = writeln!(io::stderr().lock());
+        }
+    }
+}
+
+fn apt_position(line: &[u8]) -> Option<(&'static str, u8)> {
+    let mut fields = std::str::from_utf8(line).ok()?.split(':');
+    let stage = match fields.next()? {
+        "dlstatus" => "downloading",
+        "pmstatus" => "applying",
+        _ => return None,
+    };
+    fields.next()?;
+    let field = fields.next()?;
+    let percent: f64 = field.parse().ok().or_else(|| fields.next()?.parse().ok())?;
+    (0.0..=100.0)
+        .contains(&percent)
+        .then(|| (stage, percent.round() as u8))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_apt_download_and_arch_qualified_dpkg_positions() {
+        assert_eq!(
+            apt_position(b"dlstatus:1:33.25:Fetching"),
+            Some(("downloading", 33))
+        );
+        assert_eq!(
+            apt_position(b"pmstatus:base-files:arm64:74.5:Preparing"),
+            Some(("applying", 75))
+        );
+        assert_eq!(apt_position(b"pmerror:1:12.0:failed"), None);
+        assert_eq!(apt_position(b"pmstatus:1:NaN:invalid"), None);
+    }
 }

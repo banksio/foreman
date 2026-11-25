@@ -1010,6 +1010,18 @@ fn cleanup(ctx: &Context, engine: &Engine) -> AppResult<Vec<String>> {
     )])
 }
 
+pub(super) fn ensure_no_recovery(ctx: &Context<'_>) -> AppResult<()> {
+    if let Some((stack, _)) = saved_states(ctx)?
+        .into_iter()
+        .find(|(_, state)| state.recovery.is_some())
+    {
+        return Err(Error::blocked(format!(
+            "Resolve Docker rollback recovery for {stack} before replacing Foreman"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
