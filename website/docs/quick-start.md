@@ -12,12 +12,28 @@ Use a [supported 64-bit Debian-family host](./compatibility.md) with Bash, curl 
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl
-curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.1.1/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.2.0/install.sh | bash
 ```
 
 The installer selects the package using `dpkg --print-architecture`, verifies the SHA-256 checksum from the tagged release and passes the package to APT. It refuses to replace a newer Foreman package with an older release.
 
 To inspect the installer before running it, download it to a file and run `bash install.sh` after review. You can also download a `.deb` and `SHA256SUMS` from the release, verify the artifact and install the local file through APT. [GitHub Releases](https://github.com/banksio/foreman/releases)
+
+## Standalone installation
+
+On supported Debian-family hosts, the standalone installer uses `curl`, OpenSSL 3, and `jq` to verify a signed release before installing it. Foreman also uses `netcat-openbsd` for APT repository preflight.
+
+```bash
+sudo apt-get install ca-certificates curl openssl jq netcat-openbsd
+curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.2.0/install.sh | bash -s -- --standalone
+foreman self update --check
+sudo foreman self update
+```
+
+Standalone Foreman installs to `/usr/local/bin/foreman` with a root-owned receipt under `/usr/local/lib/foreman`. Self-update verifies expiry, the publisher signature and binary checksum. It takes the maintenance lock, checks compatibility with saved state, and keeps the previous binary and a backup before activation. Updates are operator-triggered.
+
+If you already installed the Debian package, follow the [switching instructions](./recovery.md#switch-from-the-debian-package-to-standalone). To keep using the Debian package, run the installer from a newer release tag.
+
 
 ## Check the host
 

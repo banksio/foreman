@@ -453,8 +453,8 @@ fn replace(
             let service_contents = format!(
                 "{}\n[Unit]\nDescription=Foreman maintenance ({name})\nWants=network-online.target\nAfter=network-online.target time-sync.target\n\n[Service]\nType=oneshot\nUMask=0022\nExecStart={} __scheduled {name}\nExecStopPost={} __reconcile {name}\nTimeoutStartSec=6h\nTimeoutStopSec=3min\nKillMode=mixed\nSuccessExitStatus=3 4 5\n",
                 systemd::MANAGED,
-                systemd::RUNNER,
-                systemd::RUNNER,
+                systemd::runner(),
+                systemd::runner(),
             );
             let timer_contents = format!(
                 "{}\n[Unit]\nDescription=Foreman schedule ({name})\n\n[Timer]\nOnCalendar={}\nPersistent=true\nAccuracySec=1s\nUnit={service}\n\n[Install]\nWantedBy=timers.target\n",

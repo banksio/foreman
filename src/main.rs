@@ -9,6 +9,7 @@ mod providers;
 mod schedule;
 mod store;
 mod systemd;
+mod updater;
 
 use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
@@ -131,6 +132,10 @@ enum Command {
     Notify,
     #[command(name = "apt-verify-plan", hide = true)]
     AptVerifyPlan { path: PathBuf },
+    #[command(name = "__install-standalone", hide = true)]
+    InstallStandalone { bundle: PathBuf },
+    #[command(name = "__validate-update-state", hide = true)]
+    ValidateUpdateState,
     #[command(name = "__schemas", hide = true)]
     Schemas { directory: PathBuf },
 }
@@ -184,7 +189,7 @@ enum ModuleCommand {
 enum SelfCommand {
     /// Print the running Foreman version.
     Version,
-    /// Show the package-managed update path.
+    /// Verify and install the latest stable standalone release.
     Update {
         #[arg(long)]
         check: bool,
@@ -295,9 +300,7 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
         Command::SelfManage {
             command: SelfCommand::Update { .. },
         } => {
-            return Err(Error::blocked(
-                "Use install.sh with the desired release tag to upgrade the Debian package",
-            ));
+            updater::check_update_installation()?;
         }
         Command::AptVerifyPlan { path } => {
             host::verify_apt_plan(path)?;
@@ -448,6 +451,14 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
             }
             docker::command(&ctx, command)?
         }
+        Command::SelfManage {
+            command: SelfCommand::Update { check },
+        } => updater::update(&ctx, check)?,
+        Command::InstallStandalone { bundle } => updater::install(&ctx, &bundle)?,
+        Command::ValidateUpdateState => {
+            updater::verify_state(&ctx)?;
+            return Ok(Outcome::Completed);
+        }
         Command::Resume => cycle::resume(&ctx)?,
         Command::Scheduled { name } => scheduled(&ctx, name)?,
         Command::Reconcile { name } => {
@@ -560,7 +571,12 @@ fn takes_maintenance_lock(command: &Command) -> bool {
         Command::Docker {
             command: DockerCommand::Stack { command },
         } => !matches!(command, docker::DockerAction::Show { .. }),
-        Command::Cycle { .. } | Command::Resume => true,
+        Command::Cycle { .. }
+        | Command::Resume
+        | Command::InstallStandalone { .. }
+        | Command::SelfManage {
+            command: SelfCommand::Update { check: false },
+        } => true,
         _ => false,
     }
 }
