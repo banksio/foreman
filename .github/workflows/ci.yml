@@ -31,9 +31,9 @@ jobs:
         run: |
           bash -n install.sh
           bash -n packaging/debian/build.sh
-          for hook in postinst prerm postrm; do sh -n "packaging/debian/$hook"; done
+          for hook in preinst postinst prerm postrm; do sh -n "packaging/debian/$hook"; done
           bash install.sh --help
-          shellcheck install.sh packaging/debian/{build.sh,postinst,prerm,postrm}
+          shellcheck install.sh packaging/debian/{build.sh,preinst,postinst,prerm,postrm}
 
   docs:
     runs-on: ubuntu-24.04

@@ -758,3 +758,8 @@ pub fn maintain(ctx: &Context, target: Option<&str>) -> AppResult<Report> {
     }
     update::maintain(ctx, enrollments, target)
 }
+
+pub fn validate_update_state(ctx: &Context<'_>) -> AppResult<()> {
+    all(ctx)?;
+    update::ensure_no_recovery(ctx)
+}

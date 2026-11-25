@@ -162,6 +162,9 @@ pub fn check_protected_parent(path: &Path) -> AppResult<()> {
             "/etc/systemd/system",
             "/var/lib/foreman",
             "/run/foreman",
+            "/usr/local/bin",
+            "/usr/local/lib/foreman",
+            "/usr/local/lib/systemd/system",
         ]
         .into_iter()
         .any(|base| path.starts_with(base))

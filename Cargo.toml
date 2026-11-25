@@ -1,6 +1,6 @@
 [package]
 name = "foreman"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "Local maintenance for Debian-family hosts"

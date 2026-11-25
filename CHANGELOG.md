@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+- Show live APT download and package application progress in interactive runs.
+- Add standalone Linux installs with receipt-based, signed release verification and operator-triggered self-update on amd64 and arm64.
+
 ## 0.1.1
 
 - Added an administrator-controlled, per-project exception for user-owned Docker Compose inputs. Foreman warns when the exception is active.

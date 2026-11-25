@@ -150,10 +150,18 @@ static DEBIAN_VERSION: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 fn apt(args: &[&str], seconds: u64) -> AppResult<process::Output> {
+    apt_run(args, seconds, None)
+}
+
+fn apt_run(args: &[&str], seconds: u64, progress: Option<&str>) -> AppResult<process::Output> {
     let mut command = SECURE.to_vec();
     command.extend_from_slice(NO_CACHES);
     command.extend_from_slice(args);
-    process::run_env("apt-get", &command, Duration::from_secs(seconds), APT_ENV)
+    let timeout = Duration::from_secs(seconds);
+    match progress {
+        Some(label) => process::apt_with_progress(&command, timeout, APT_ENV, label),
+        None => process::run_env("apt-get", &command, timeout, APT_ENV),
+    }
 }
 
 fn validate_sources() -> AppResult<()> {
@@ -263,11 +271,11 @@ fn has_insecure_source_options(text: &str, deb822: bool) -> bool {
     active_insecure(&fields)
 }
 
-fn refresh() -> AppResult<()> {
+fn refresh(progress: bool) -> AppResult<()> {
     let mut args = LOCK_WAIT.to_vec();
     args.extend_from_slice(UPDATE);
     for retry in 0..=2 {
-        let result = apt(&args, 600)?;
+        let result = apt_run(&args, 600, progress.then_some("APT indexes"))?;
         if result.success {
             return Ok(());
         }
@@ -777,7 +785,7 @@ pub fn upgrade(ctx: &Context<'_>) -> AppResult<Report> {
         recover()?;
     }
     if !ctx.dry_run {
-        refresh()?;
+        refresh(ctx.progress)?;
     }
     let mut warnings = Vec::new();
     if dirty {
@@ -829,6 +837,7 @@ pub fn upgrade(ctx: &Context<'_>) -> AppResult<Report> {
                 &actions,
                 ctx.config.apt.max_removals == 0,
                 5400,
+                ctx.progress.then_some("APT upgrade"),
             )?;
             if !result.success {
                 if result
@@ -868,7 +877,7 @@ pub fn upgrade(ctx: &Context<'_>) -> AppResult<Report> {
     unreachable!("bounded upgrade loop returns on its final attempt")
 }
 
-pub(super) fn guarded_purge(targets: &[String], preview: bool) -> AppResult<Vec<Action>> {
+pub(super) fn guarded_purge(targets: &[String], ctx: &Context<'_>) -> AppResult<Vec<Action>> {
     validate_sources()?;
     if audit()? {
         return Err(Error::blocked(
@@ -903,8 +912,14 @@ pub(super) fn guarded_purge(targets: &[String], preview: bool) -> AppResult<Vec<
             "Kernel purge would remove a held or protected package",
         ));
     }
-    if !preview {
-        let result = guarded_apply(&command, &actions, false, 1200)?;
+    if !ctx.dry_run {
+        let result = guarded_apply(
+            &command,
+            &actions,
+            false,
+            1200,
+            ctx.progress.then_some("APT kernel purge"),
+        )?;
         if !result.success {
             if result
                 .stderr
@@ -930,6 +945,7 @@ fn guarded_apply(
     actions: &[Action],
     no_remove: bool,
     seconds: u64,
+    progress: Option<&str>,
 ) -> AppResult<process::Output> {
     let mut file = tempfile::Builder::new()
         .prefix("foreman-apt-")
@@ -977,7 +993,7 @@ fn guarded_apply(
         args.push("--no-remove");
     }
     args.extend_from_slice(command);
-    apt(&args, seconds)
+    apt_run(&args, seconds, progress)
 }
 
 const MAX_HOOK_INPUT: u64 = 16 * MIB;

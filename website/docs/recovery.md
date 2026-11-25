@@ -47,3 +47,14 @@ sudo apt-get purge foreman
 ```
 
 Removal stops Foreman's jobs and removes its generated units. Removal retains the package example configuration. Purge removes the example and package-owned timer state. Both preserve operator intent and observed state in the shared Foreman directories. Review those contents before deleting them manually. After reinstalling, explicitly disable and re-enable any saved schedules you want to reactivate.
+
+
+## Switch from the Debian package to standalone
+
+Resolve pending maintenance or Docker rollback work before switching. Record your enabled schedules. Remove the Debian package with `sudo apt-get remove foreman`, then run the [standalone installer](./quick-start.md#standalone-installation). Both installations use the same configuration and observations directories. Re-enable the schedules you want to resume with `sudo foreman schedule enable NAME`. Review the optional notification timer separately if you used it.
+
+## Recover an interrupted standalone update
+
+Run `sudo foreman self update` again to reconcile an interrupted activation. Foreman verifies the installed candidate before committing the receipt, or restores the previous executable. The updater validates configuration and observations in read-only mode. Its previous binary and state archive are protected under `/usr/local/lib/foreman`.
+
+If publisher trust needs to be reset after loss or compromise of the root signing key, use the separately authenticated project repository and verify the new public key fingerprint with the maintainer before reinstalling. A standalone binary rejects release metadata outside its pinned root of trust.

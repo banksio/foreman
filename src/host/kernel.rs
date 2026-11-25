@@ -204,7 +204,7 @@ pub fn kernels(ctx: &Context<'_>) -> AppResult<Report> {
                 .detail(serde_json::json!({"retained": kept})),
         );
     }
-    apt::guarded_purge(&targets, ctx.dry_run)?;
+    apt::guarded_purge(&targets, ctx)?;
     let verb = if ctx.dry_run {
         "Would remove"
     } else {
