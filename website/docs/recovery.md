@@ -26,19 +26,19 @@ Review outstanding image holds and unresolved rollback records before moving or 
 
 1. Back up the Python configuration, state and any units that trigger it. Review and resolve pending Python maintenance before retiring its timers.
 2. Identify legacy jobs with `systemctl list-timers --all` and inspect their service definitions. Python uses `foreman-window.timer` and may install `/etc/systemd/system/foreman-resume.service`. Disable only the confirmed Python units. Archive the legacy resume unit before enabling Rust continuation.
-3. Install the Rust package and use `/usr/bin/foreman --version` to confirm which binary you are calling. Check `command -v foreman` in case a locally installed Python command still takes precedence.
+3. Install Foreman and use `foreman --version` to confirm which binary you are calling. Check `command -v foreman` in case a locally installed Python command still takes precedence.
 4. Review the Python settings against the shipped example. Re-create schedules and explicitly enroll each Compose project intended for Foreman maintenance. Use `foreman docker stacks` to inspect discovery and eligibility.
-5. Enable the packaged boot resume unit if a legacy unit was present when the package was installed. Run a preview before enabling scheduled actions.
+5. Enable the boot resume unit if needed and run a preview before enabling scheduled actions.
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable foreman-resume.service
-sudo /usr/bin/foreman run --dry-run --no-reboot
+sudo foreman run --dry-run --no-reboot
 ```
 
 ## Upgrade or remove
 
-To upgrade, install the new tagged Debian package or use the installer from that release. Parked maintenance or unresolved rollback work should be resolved before replacing the binary. `foreman self version` shows the installed version.
+For standalone upgrades, use `sudo foreman self update`. For package-managed installations, use APT with the new tagged Debian package. Resolve parked maintenance or unresolved rollback work before replacing the binary. `foreman self version` shows the installed version. The following removal commands apply to package-managed installations.
 
 ```bash
 sudo apt-get remove foreman
@@ -51,7 +51,16 @@ Removal stops Foreman's jobs and removes its generated units. Removal retains th
 
 ## Switch from the Debian package to standalone
 
-Resolve pending maintenance or Docker rollback work before switching. Record your enabled schedules. Remove the Debian package with `sudo apt-get remove foreman`, then run the [standalone installer](./quick-start.md#standalone-installation). Both installations use the same configuration and observations directories. Re-enable the schedules you want to resume with `sudo foreman schedule enable NAME`. Review the optional notification timer separately if you used it.
+Resolve pending maintenance or Docker rollback work before switching.
+
+```bash
+sudo apt-get install -y ca-certificates curl openssl jq netcat-openbsd
+curl -fsSL https://raw.githubusercontent.com/banksio/foreman/v0.2.1/install.sh | bash -s -- --migrate-deb
+hash -r
+foreman self update --check
+```
+
+Migration verifies the standalone release, backs up configuration and observations, installs the replacement, and removes only the Foreman package. Your configuration, Docker enrollments and schedule definitions stay in place. Package removal stops the old timers. Use `sudo foreman schedule enable NAME` to resume a saved schedule, and re-enable the optional notification timer if you used it. If dpkg cannot finish removing the package, resolve its error and rerun the migration command.
 
 ## Recover an interrupted standalone update
 

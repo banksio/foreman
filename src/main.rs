@@ -133,7 +133,11 @@ enum Command {
     #[command(name = "apt-verify-plan", hide = true)]
     AptVerifyPlan { path: PathBuf },
     #[command(name = "__install-standalone", hide = true)]
-    InstallStandalone { bundle: PathBuf },
+    InstallStandalone {
+        bundle: PathBuf,
+        #[arg(long)]
+        migrate_deb: bool,
+    },
     #[command(name = "__validate-update-state", hide = true)]
     ValidateUpdateState,
     #[command(name = "__schemas", hide = true)]
@@ -454,7 +458,10 @@ fn execute(cli: Cli) -> AppResult<Outcome> {
         Command::SelfManage {
             command: SelfCommand::Update { check },
         } => updater::update(&ctx, check)?,
-        Command::InstallStandalone { bundle } => updater::install(&ctx, &bundle)?,
+        Command::InstallStandalone {
+            bundle,
+            migrate_deb,
+        } => updater::install(&ctx, &bundle, migrate_deb)?,
         Command::ValidateUpdateState => {
             updater::verify_state(&ctx)?;
             return Ok(Outcome::Completed);
