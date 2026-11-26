@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Make the signed standalone build the default and only quick-installer target.
+- Add an explicit migration from existing Debian packages that keeps operator configuration and state.
+
 ## 0.2.0
 
 - Show live APT download and package application progress in interactive runs.

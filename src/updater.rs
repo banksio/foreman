@@ -318,33 +318,94 @@ pub fn uses_local_binary() -> bool {
     running_at_install_path() && receipt().is_ok()
 }
 
-fn reject_debian_install() -> AppResult<()> {
-    // Refuse co-ownership even when a dpkg installation has been partly removed.
+fn debian_package() -> AppResult<Option<String>> {
     let path = Path::new("/usr/bin/foreman");
-    let owned = if process::available("dpkg-query") {
+    if process::available("dpkg-query") {
         let query = process::run(
-            "dpkg-query",
+            "/usr/bin/dpkg-query",
             &["-S", "--", "/usr/bin/foreman"],
             Duration::from_secs(10),
         )?;
         match query.code {
-            Some(0) => true,
-            Some(1) => false,
+            Some(0)
+                if matches!(
+                    query.stdout.trim(),
+                    "foreman: /usr/bin/foreman"
+                        | "foreman:arm64: /usr/bin/foreman"
+                        | "foreman:amd64: /usr/bin/foreman"
+                ) =>
+            {
+                let version = process::run(
+                    "/usr/bin/dpkg-query",
+                    &["-W", "-f=${Version}", "foreman"],
+                    Duration::from_secs(10),
+                )?;
+                if !version.success || version.stdout.trim().is_empty() {
+                    return Err(Error::blocked(
+                        "Could not determine the installed Foreman package version",
+                    ));
+                }
+                return Ok(Some(version.stdout.trim().to_owned()));
+            }
+            Some(1) => {}
             _ => {
                 return Err(Error::blocked(
-                    "Could not determine Debian package ownership of Foreman",
+                    "Could not verify that the Foreman package owns /usr/bin/foreman",
                 ));
             }
         }
-    } else {
-        false
-    };
-    if owned || exists(path)? {
+    }
+    if exists(path)? {
         return Err(Error::blocked(
-            "Foreman is installed at /usr/bin/foreman. For a Debian package, rerun install.sh from a newer tag or use the package manager",
+            "An executable at /usr/bin/foreman is outside the supported package migration path",
         ));
     }
+    Ok(None)
+}
+
+fn migration_required() -> Error {
+    Error::blocked(
+        "This Foreman installation is managed by dpkg. Run the latest install.sh with --migrate-deb to enable self-update",
+    )
+}
+
+fn reject_debian_install() -> AppResult<()> {
+    if debian_package()?.is_some() {
+        return Err(migration_required());
+    }
     Ok(())
+}
+
+fn check_migration_version(previous: &str, next: &str) -> AppResult<()> {
+    let downgrade = process::run(
+        "/usr/bin/dpkg",
+        &["--compare-versions", previous, "gt", next],
+        Duration::from_secs(10),
+    )?;
+    match downgrade.code {
+        Some(0) => Err(Error::blocked(
+            "The Debian Foreman package is newer than the standalone candidate",
+        )),
+        Some(1) => Ok(()),
+        _ => Err(Error::blocked(
+            "Could not compare the package and standalone release versions",
+        )),
+    }
+}
+
+fn remove_debian_package() -> AppResult<()> {
+    let removal = process::run(
+        "/usr/bin/dpkg",
+        &["--remove", "foreman"],
+        Duration::from_secs(120),
+    )?;
+    if !removal.success {
+        return Err(Error::failed(format!(
+            "Standalone Foreman is staged, but removing the Debian package failed. Resolve the dpkg error and rerun the installer with --migrate-deb. {}",
+            removal.stderr.trim()
+        )));
+    }
+    reject_debian_install()
 }
 
 pub fn verify_state(ctx: &Context<'_>) -> AppResult<()> {
@@ -626,31 +687,66 @@ fn setup_units(ctx: &Context<'_>) -> AppResult<()> {
     Ok(())
 }
 
-pub fn install(ctx: &Context<'_>, bundle: &Path) -> AppResult<Report> {
+pub fn install(ctx: &Context<'_>, bundle: &Path, migrate_deb: bool) -> AppResult<Report> {
     platform()?;
-    reject_debian_install()?;
+    let debian = debian_package()?;
+    if debian.is_some() && !migrate_deb {
+        return Err(migration_required());
+    }
     gate(ctx, false)?;
     systemd::require_legacy_resolution(ctx)?;
     store::check_protected_parent(Path::new(EXECUTABLE).parent().unwrap())?;
     store::check_protected_parent(Path::new(HOME))?;
+    store::check_protected_parent(Path::new(UNITS))?;
+    for name in [
+        "foreman-resume.service",
+        "foreman-notify.service",
+        "foreman-notify.timer",
+    ] {
+        systemd::check_owned(&Path::new(UNITS).join(name))?;
+    }
+
+    let mut migration_warnings = Vec::new();
+    if debian.is_some() {
+        for schedule in schedule::list(ctx)?
+            .into_iter()
+            .filter(|schedule| schedule.job.enabled)
+        {
+            migration_warnings.push(format!(
+                "Restore the saved schedule with sudo foreman schedule enable {}",
+                schedule.name
+            ));
+        }
+        if ctx.host.systemd
+            && systemd::systemctl(&["is-enabled", "--quiet", "foreman-notify.timer"])
+                .is_ok_and(|output| output.success)
+        {
+            migration_warnings.push("Restore the notification timer with sudo systemctl enable --now foreman-notify.timer".into());
+        }
+    }
+
     if exists(&journal())? {
         recover()?;
     }
     if exists(Path::new(EXECUTABLE))? {
-        if receipt().is_ok_and(|installed| {
-            store::trusted_file(Path::new(EXECUTABLE)).is_ok()
-                && bytes(Path::new(EXECUTABLE), BINARY_LIMIT)
-                    .is_ok_and(|data| sha256(&data) == installed.sha256)
-        }) {
-            setup_units(ctx)?;
-            return Ok(Report::new(
-                Outcome::Unchanged,
-                "Standalone Foreman already exists. Use sudo foreman self update",
+        let installed = receipt()?;
+        store::trusted_file(Path::new(EXECUTABLE))?;
+        if sha256(&bytes(Path::new(EXECUTABLE), BINARY_LIMIT)?) != installed.sha256 {
+            return Err(Error::blocked(
+                "The existing standalone executable differs from its installation receipt",
             ));
         }
-        return Err(Error::blocked(
-            "An executable already exists at the standalone install path",
-        ));
+        check_runnable(Path::new(EXECUTABLE), &installed.version)?;
+        if let Some(previous) = &debian {
+            check_migration_version(previous, &installed.version)?;
+            remove_debian_package()?;
+        }
+        return finish_install(
+            ctx,
+            &installed.version,
+            debian.is_some(),
+            migration_warnings,
+        );
     }
     if exists(&local("receipt.json"))? {
         return Err(Error::blocked(
@@ -680,12 +776,35 @@ pub fn install(ctx: &Context<'_>, bundle: &Path) -> AppResult<Report> {
         ));
     }
     let version = next.version.clone();
+    if let Some(previous) = &debian {
+        check_migration_version(previous, &version)?;
+        fs::create_dir_all(HOME)?;
+        backup_state(ctx)?;
+    }
+    // Activate the signed replacement before removing the package, so the executable
+    // remains available if dpkg cannot complete removal.
     activate(ctx, &temp.path().join(&file), None, next)?;
+    if debian.is_some() {
+        remove_debian_package()?;
+    }
+    finish_install(ctx, &version, debian.is_some(), migration_warnings)
+}
+
+fn finish_install(
+    ctx: &Context<'_>,
+    version: &str,
+    migrated: bool,
+    warnings: Vec<String>,
+) -> AppResult<Report> {
     setup_units(ctx)?;
-    Ok(Report::new(
-        Outcome::Completed,
-        format!("Installed standalone Foreman {version} at {EXECUTABLE}"),
-    ))
+    let summary = if migrated {
+        format!("Migrated the Debian package to standalone Foreman {version} at {EXECUTABLE}")
+    } else {
+        format!("Standalone Foreman {version} is installed at {EXECUTABLE}")
+    };
+    let mut report = Report::new(Outcome::Completed, summary);
+    report.warnings = warnings;
+    Ok(report)
 }
 
 #[cfg(test)]

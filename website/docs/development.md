@@ -40,7 +40,7 @@ Use Conventional Commits and the Git Flow branch model in the repository's agent
 The release workflow builds both Debian packages and standalone binaries from the existing annotated tag. After the workflow passes, a maintainer downloads the artifacts and signs them on a trusted workstation. Keep the Ed25519 root private key offline and use a separate delegated release private key for routine signing. Publish the packages and binaries together with the manifest, keyring, detached signatures, and checksums.
 
 ```bash
-tag=v0.2.0
+tag=v0.2.1
 run_id=RELEASE_WORKFLOW_RUN_ID
 dist=$(mktemp -d)
 gh run download "$run_id" --repo banksio/foreman --dir "$dist"
